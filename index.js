@@ -1,2 +1,3 @@
-require('./angular');
-module.exports = angular;
+import './angular.js';
+
+export default window.angular;
