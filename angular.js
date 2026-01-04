@@ -1,3 +1,24 @@
+// Internet Explorer detection and blocking (ES5 compatible)
+if (window.document.documentMode || /MSIE|Trident/.test(window.navigator.userAgent)) {
+  // Clear all page content
+  if (window.document.body) {
+    window.document.body.innerHTML = '';
+  }
+  if (window.document.head) {
+    window.document.head.innerHTML = '<title>Browser Not Supported</title>';
+  }
+  
+  // Create and display error message
+  var errorDiv = window.document.createElement('div');
+  errorDiv.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f8f8f8; display: flex; align-items: center; justify-content: center; font-family: Arial, sans-serif; z-index: 999999;';
+  errorDiv.innerHTML = '<div style="text-align: center; padding: 40px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-width: 500px;"><h1 style="color: #d32f2f; margin-bottom: 20px;">Browser Not Supported</h1><p style="color: #666; font-size: 16px; line-height: 1.5; margin-bottom: 20px;">Internet Explorer is not compatible with this application. Please use a modern browser such as:</p><ul style="text-align: left; color: #666; margin: 20px 0;"><li>Google Chrome</li><li>Mozilla Firefox</li><li>Microsoft Edge</li><li>Safari</li></ul></div>';
+  
+  window.document.body.appendChild(errorDiv);
+  
+  // Prevent any further script execution
+  throw new Error('Internet Explorer is not supported');
+}
+
 ((window) => {
 'use strict';
 
@@ -95,7 +116,7 @@ function isValidObjectMaxDepth(maxDepth) {
 function minErr(module, ErrorConstructor) {
   ErrorConstructor = ErrorConstructor || Error;
 
-  var url = 'https://errors.angularjs.org/1.8.4/';
+  var url = 'https://errors.angularjs.org/1.8.5/';
   var regex = url.replace('.', '\\.') + '[\\s\\S]*';
   var errRegExp = new RegExp(regex, 'g');
 
@@ -139,7 +160,6 @@ function minErr(module, ErrorConstructor) {
 /* We need to tell ESLint what variables are being exported */
 /* exported
   angular,
-  msie,
   jqLite,
   jQuery,
   slice,
@@ -282,9 +302,7 @@ var lowercase = function (string) { return isString(string) ? string.toLowerCase
  */
 var uppercase = function (string) { return isString(string) ? string.toUpperCase() : string; };
 
-
 var
-  msie,             // holds major version number for IE, or NaN if UA is not IE.
   jqLite,           // delay binding since jQuery could be loaded after us.
   jQuery,           // delay binding
   slice = [].slice,
@@ -298,17 +316,6 @@ var
   angular = window.angular || (window.angular = {}),
   angularModule,
   uid = { current: 0 };
-
-// Support: IE 9-11 only
-/**
- * documentMode is an IE-only property
- * http://msdn.microsoft.com/en-us/library/ie/cc196988(v=vs.85).aspx
- */
-msie = window.document.documentMode;
-
-function setMsie(value) {
-  msie = value;
-}
 
 
 /**
@@ -1011,7 +1018,7 @@ function arrayRemove(array, value) {
 function copy(source, destination, maxDepth) {
   var stackSource = [];
   var stackDest = [];
-  maxDepth = isValidObjectMaxDepth(maxDepth) ? maxDepth : NaN;
+  maxDepth = isValidObjectMaxDepth(maxDepth) ? maxDepth : 50;
 
   if (destination) {
     if (isTypedArray(destination) || isArrayBuffer(destination)) {
@@ -1121,15 +1128,6 @@ function copy(source, destination, maxDepth) {
         return new source.constructor(copyElement(source.buffer), source.byteOffset, source.length);
 
       case '[object ArrayBuffer]':
-        // Support: IE10
-        if (!source.slice) {
-          // If we're in this case we know the environment supports ArrayBuffer
-          /* eslint-disable no-undef */
-          var copied = new ArrayBuffer(source.byteLength);
-          new Uint8Array(copied).set(new Uint8Array(source));
-          /* eslint-enable */
-          return copied;
-        }
         return source.slice(0);
 
       case '[object Boolean]':
@@ -1139,7 +1137,11 @@ function copy(source, destination, maxDepth) {
         return new source.constructor(source.valueOf());
 
       case '[object RegExp]':
-        var re = new RegExp(source.source, source.toString().match(/[^/]*$/)[0]);
+        // PATCH: Use the native RegExp.flags property instead of parsing flags
+        // from RegExp.prototype.toString(). Parsing flags via regex can lead to
+        // Regular Expression Denial of Service (ReDoS) vulnerabilities.
+        // This change mitigates CVE-2023-26116.
+        var re = new RegExp(source.source, source.flags);
         re.lastIndex = source.lastIndex;
         return re;
 
@@ -1480,8 +1482,8 @@ function fromJson(json) {
 
 var ALL_COLONS = /:/g;
 function timezoneToOffset(timezone, fallback) {
-  // Support: IE 9-11 only, Edge 13-15+
-  // IE/Edge do not "understand" colon (`:`) in timezone
+  // Support: Edge 13-15+
+  // Edge do not "understand" colon (`:`) in timezone
   timezone = timezone.replace(ALL_COLONS, '');
   var requestedTimezoneOffset = Date.parse('Jan 01, 1970 00:00:00 ' + timezone) / 60000;
   return isNumberNaN(requestedTimezoneOffset) ? fallback : requestedTimezoneOffset;
@@ -1643,12 +1645,6 @@ function getNgAttribute(element, ngAttr) {
 
 function allowAutoBootstrap(document) {
   var script = document.currentScript;
-
-  if (!script) {
-    // Support: IE 9-11 only
-    // IE does not have `document.currentScript`
-    return true;
-  }
 
   // If the `currentScript` property has been clobbered just return false, since this indicates a probable attack
   if (!(script instanceof window.HTMLScriptElement || script instanceof window.SVGScriptElement)) {
@@ -2831,10 +2827,10 @@ function toDebugString(obj, maxDepth) {
 var version = {
   // These placeholder strings will be replaced by grunt's `build` task.
   // They need to be double- or single-quoted.
-  full: '1.8.4',
+  full: '1.8.5',
   major: 1,
   minor: 8,
-  dot: 4,
+  dot: 5,
   codeName: 'lts'
 };
 
@@ -2993,7 +2989,7 @@ function publishExternalAPI(angular) {
       });
     }
   ])
-    .info({ angularVersion: '1.8.4' });
+    .info({ angularVersion: '1.8.5' });
 }
 'use strict';
 
@@ -3191,21 +3187,10 @@ var wrapMap = {
 wrapMap.tbody = wrapMap.tfoot = wrapMap.colgroup = wrapMap.caption = wrapMap.thead;
 wrapMap.th = wrapMap.td;
 
-// Support: IE <10 only
-// IE 9 requires an option wrapper & it needs to have the whole table structure
-// set up in advance; assigning `"<td></td>"` to `tr.innerHTML` doesn't work, etc.
-var wrapMapIE9 = {
-  option: [1, '<select multiple="multiple">', '</select>'],
-  _default: [0, '', '']
-};
-
 for (var key in wrapMap) {
   var wrapMapValueClosing = wrapMap[key];
   var wrapMapValue = wrapMapValueClosing.slice().reverse();
-  wrapMapIE9[key] = [wrapMapValue.length, '<' + wrapMapValue.join('><') + '>', '</' + wrapMapValueClosing.join('></') + '>'];
 }
-
-wrapMapIE9.optgroup = wrapMapIE9.option;
 
 function jqLiteIsTextNode(html) {
   return !HTML_REGEXP.test(html);
@@ -3241,27 +3226,16 @@ function jqLiteBuildFragment(html, context) {
       html.replace(XHTML_TAG_REGEXP, '<$1></$2>') :
       html;
 
-    if (msie < 10) {
-      wrap = wrapMapIE9[tag] || wrapMapIE9._default;
-      tmp.innerHTML = wrap[1] + finalHtml + wrap[2];
+    wrap = wrapMap[tag] || [];
 
-      // Descend through wrappers to the right content
-      i = wrap[0];
-      while (i--) {
-        tmp = tmp.firstChild;
-      }
-    } else {
-      wrap = wrapMap[tag] || [];
-
-      // Create wrappers & descend into them
-      i = wrap.length;
-      while (--i > -1) {
-        tmp.appendChild(window.document.createElement(wrap[i]));
-        tmp = tmp.firstChild;
-      }
-
-      tmp.innerHTML = finalHtml;
+    // Create wrappers & descend into them
+    i = wrap.length;
+    while (--i > -1) {
+      tmp.appendChild(window.document.createElement(wrap[i]));
+      tmp = tmp.firstChild;
     }
+
+    tmp.innerHTML = finalHtml;
 
     nodes = concat(nodes, tmp.childNodes);
 
@@ -3304,12 +3278,6 @@ function jqLiteWrapNode(node, wrapper) {
   wrapper.appendChild(node);
 }
 
-
-// IE9-11 has no method "contains" in SVG element and in Node.prototype. Bug #10259.
-var jqLiteContains = window.Node.prototype.contains || /** @this */ function (arg) {
-  // eslint-disable-next-line no-bitwise
-  return !!(this.compareDocumentPosition(arg) & 16);
-};
 
 /////////////////////////////////////////////
 function JQLite(element) {
@@ -3594,7 +3562,6 @@ function jqLiteDocumentLoaded(action, win) {
 function jqLiteReady(fn) {
   function trigger() {
     window.document.removeEventListener('DOMContentLoaded', trigger);
-    window.removeEventListener('load', trigger);
     fn();
   }
 
@@ -3602,13 +3569,7 @@ function jqLiteReady(fn) {
   if (window.document.readyState === 'complete') {
     window.setTimeout(fn);
   } else {
-    // We can not use jqLite since we are not done loading and jQuery could be loaded later.
-
-    // Works for modern browsers and IE9
     window.document.addEventListener('DOMContentLoaded', trigger);
-
-    // Fallback to window.onload for others
-    window.addEventListener('load', trigger);
   }
 }
 
@@ -3909,7 +3870,7 @@ function specialMouseHandlerWrapper(target, event, handler) {
   var related = event.relatedTarget;
   // For mousenter/leave call the handler if related is outside the target.
   // NB: No relatedTarget if the mouse left/entered the browser window
-  if (!related || (related !== target && !jqLiteContains.call(target, related))) {
+  if (!related || (related !== target && !target.contains(related))) {
     handler.call(target, event);
   }
 }
@@ -5176,9 +5137,7 @@ function createInjector(modulesToLoad, strictDi) {
     }
 
     function isClass(func) {
-      // Support: IE 9-11 only
-      // IE 9-11 do not support classes and IE9 leaks with the code below.
-      if (msie || typeof func !== 'function') {
+      if (typeof func !== 'function') {
         return false;
       }
       var result = func.$$ngIsClass;
@@ -6632,11 +6591,7 @@ function Browser(window, document, $log, $sniffer, $$taskTrackerFactory) {
       baseElement = document.find('base'),
       pendingLocation = null,
       getCurrentState = !$sniffer.history ? noop : function getCurrentState() {
-        try {
           return history.state;
-        } catch (e) {
-          // MSIE can reportedly throw when there is no state (UNCONFIRMED).
-        }
       };
 
   cacheState();
@@ -9404,54 +9359,144 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
 
 
       function sanitizeSrcset(value, invokeType) {
-        if (!value) {
-          return value;
-        }
+        if (!value) return value;
+
         if (!isString(value)) {
-          throw $compileMinErr('srcset', 'Can\'t pass trusted values to `{0}`: "{1}"', invokeType, value.toString());
+          throw $compileMinErr(
+            'srcset',
+            'Can\'t pass trusted values to `{0}`: "{1}"',
+            invokeType,
+            value.toString()
+          );
         }
 
-        // Such values are a bit too complex to handle automatically inside $sce.
-        // Instead, we sanitize each of the URIs individually, which works, even dynamically.
+        const trimmed = trim(value);
+        if (!trimmed) return '';
 
-        // It's not possible to work around this using `$sce.trustAsMediaUrl`.
-        // If you want to programmatically set explicitly trusted unsafe URLs, you should use
-        // `$sce.trustAsHtml` on the whole `img` tag and inject it into the DOM using the
-        // `ng-bind-html` directive.
+        const entries = /\s/.test(trimmed)
+          ? splitSrcsetCandidates(trimmed)
+          : trimmed.split(',');
 
-        var result = '';
+        const descriptorPattern = /^\d+(?:\.\d+)?[xw]$/i;
 
-        // first check if there are spaces because it's not the same pattern
-        var trimmedSrcset = trim(value);
-        //                (   999x   ,|   999w   ,|   ,|,   )
-        var srcPattern = /(\s+\d+x\s*,|\s+\d+w\s*,|\s+,|,\s+)/;
-        var pattern = /\s/.test(trimmedSrcset) ? srcPattern : /(,)/;
+        return entries
+          .map(e => trim(e))
+          .filter(Boolean)
+          .map(candidate => {
+            let url = candidate;
+            let descriptor = '';
 
-        // split srcset into tuple of uri and descriptor except for the last item
-        var rawUris = trimmedSrcset.split(pattern);
+            const lastSpace = candidate.lastIndexOf(' ');
+            if (lastSpace !== -1) {
+              const maybeDescriptor = trim(candidate.slice(lastSpace + 1));
+              if (descriptorPattern.test(maybeDescriptor)) {
+                url = trim(candidate.slice(0, lastSpace));
+                descriptor = maybeDescriptor;
+              }
+            }
 
-        // for each tuples
-        var nbrUrisWith2parts = Math.floor(rawUris.length / 2);
-        for (var i = 0; i < nbrUrisWith2parts; i++) {
-          var innerIdx = i * 2;
-          // sanitize the uri
-          result += $sce.getTrustedMediaUrl(trim(rawUris[innerIdx]));
-          // add the descriptor
-          result += ' ' + trim(rawUris[innerIdx + 1]);
-        }
+            if (!url) return null;
 
-        // split the last item into uri and descriptor
-        var lastTuple = trim(rawUris[i * 2]).split(/\s/);
+            // Strip wrapping quotes around the URL candidate, if present
+            if (url.length >= 2) {
+              const first = url.charAt(0);
+              const last = url.charAt(url.length - 1);
+              if (
+                (first === '"' && last === '"') ||
+                (first === '\'' && last === '\'')
+              ) {
+                url = url.slice(1, -1);
+              }
+            }
 
-        // sanitize the last uri
-        result += $sce.getTrustedMediaUrl(trim(lastTuple[0]));
-
-        // and add the last descriptor if any
-        if (lastTuple.length === 2) {
-          result += (' ' + trim(lastTuple[1]));
-        }
-        return result;
+            const trustedUrl = $sce.getTrustedMediaUrl(url);
+            return descriptor ? `${trustedUrl} ${descriptor}` : trustedUrl;
+          })
+          .filter(Boolean)
+          .join(', ');
       }
+
+      /* ---------------- helpers ---------------- */
+
+      const isWhitespaceCode = code =>
+        code === 0x20 || code === 0x09 || code === 0x0A ||
+        code === 0x0C || code === 0x0D;
+
+      const isDigitCode = code => code >= 0x30 && code <= 0x39;
+
+      const splitSrcsetCandidates = str => {
+        const parts = [];
+        let start = 0;
+
+        for (let i = 0; i < str.length; i++) {
+          if (str.charCodeAt(i) === 0x2C && isSeparatorComma(str, i)) {
+            parts.push(str.slice(start, i));
+            start = i + 1;
+          }
+        }
+
+        parts.push(str.slice(start));
+        return parts;
+      };
+
+      const isSeparatorComma = (str, commaIdx) => {
+        const localDescriptorPattern = /^\d+(?:\.\d+)?[xw]$/i;
+
+        const prev = commaIdx > 0 ? str.charCodeAt(commaIdx - 1) : null;
+        const next = commaIdx + 1 < str.length ? str.charCodeAt(commaIdx + 1) : null;
+
+        if (isWhitespaceCode(prev) || isWhitespaceCode(next)) {
+          return true;
+        }
+
+        // Walk backwards to inspect token before comma
+        let pos = commaIdx - 1;
+        while (pos >= 0 && isWhitespaceCode(str.charCodeAt(pos))) pos--;
+
+        if (pos < 0) return false;
+
+        const unit = str.charCodeAt(pos);
+        if (![0x78, 0x58, 0x77, 0x57].includes(unit)) {
+          // Not x/w — check if this looks like a plain token separator
+          let spacePos = pos;
+          while (spacePos >= 0 && !isWhitespaceCode(str.charCodeAt(spacePos))) {
+            spacePos--;
+          }
+
+          if (spacePos >= 0) {
+            const token = trim(str.slice(spacePos + 1, commaIdx));
+            const looksLikeUrlFragment = /[:/?&=,]/.test(token);
+
+            if (token && !looksLikeUrlFragment && !localDescriptorPattern.test(token)) {
+              return true;
+            }
+          }
+
+          return false;
+        }
+
+        // Parse numeric descriptor
+        pos--;
+        let sawDigit = false;
+        let sawDot = false;
+
+        while (pos >= 0) {
+          const code = str.charCodeAt(pos);
+          if (isDigitCode(code)) {
+            sawDigit = true;
+            pos--;
+            continue;
+          }
+          if (!sawDot && code === 0x2E) {
+            sawDot = true;
+            pos--;
+            continue;
+          }
+          break;
+        }
+
+        return sawDigit && pos >= 0 && isWhitespaceCode(str.charCodeAt(pos));
+      };
 
 
       function Attributes(element, attributesToCopy) {
@@ -9589,8 +9634,11 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
 
           nodeName = nodeName_(this.$$element);
 
-          // Sanitize img[srcset] values.
-          if (nodeName === 'img' && key === 'srcset') {
+          // Sanitize img[srcset] and source[srcset] values.
+          // Required to prevent malformed srcset entries from bypassing URL sanitization
+          // when attributes are set programmatically (CVE-2024-8373).
+          // Sanitize img[srcset] + source[srcset] values.
+          if ((nodeName === 'img' || nodeName === 'source') && key === 'srcset') {
             this[key] = value = sanitizeSrcset(value, '$set(\'srcset\', value)');
           }
 
@@ -9844,20 +9892,11 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
       function compileNodes(nodeList, transcludeFn, $rootElement, maxPriority, ignoreDirective,
         previousCompileContext) {
         var linkFns = [],
-          // `nodeList` can be either an element's `.childNodes` (live NodeList)
-          // or a jqLite/jQuery collection or an array
-          notLiveList = isArray(nodeList) || (nodeList instanceof jqLite),
           attrs, directives, nodeLinkFn, childNodes, childLinkFn, linkFnFound, nodeLinkFnFound;
 
 
         for (var i = 0; i < nodeList.length; i++) {
           attrs = new Attributes();
-
-          // Support: IE 11 only
-          // Workaround for #11781 and #14924
-          if (msie === 11) {
-            mergeConsecutiveTextNodes(nodeList, i, notLiveList);
-          }
 
           // We must always refer to `nodeList[i]` hereafter,
           // since the nodes can be replaced underneath us.
@@ -9947,32 +9986,6 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
             } else if (childLinkFn) {
               childLinkFn(scope, node.childNodes, undefined, parentBoundTranscludeFn);
             }
-          }
-        }
-      }
-
-      function mergeConsecutiveTextNodes(nodeList, idx, notLiveList) {
-        var node = nodeList[idx];
-        var parent = node.parentNode;
-        var sibling;
-
-        if (node.nodeType !== NODE_TYPE_TEXT) {
-          return;
-        }
-
-        while (true) {
-          sibling = parent ? node.nextSibling : nodeList[idx + 1];
-          if (!sibling || sibling.nodeType !== NODE_TYPE_TEXT) {
-            break;
-          }
-
-          node.nodeValue = node.nodeValue + sibling.nodeValue;
-
-          if (sibling.parentNode) {
-            sibling.parentNode.removeChild(sibling);
-          }
-          if (notLiveList && sibling === nodeList[idx + 1]) {
-            nodeList.splice(idx + 1, 1);
           }
         }
       }
@@ -10134,18 +10147,12 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
       function collectCommentDirectives(node, directives, attrs, maxPriority, ignoreDirective) {
         // function created because of performance, try/catch disables
         // the optimization of the whole function #14848
-        try {
-          var match = COMMENT_DIRECTIVE_REGEXP.exec(node.nodeValue);
-          if (match) {
-            var nName = directiveNormalize(match[1]);
-            if (addDirective(directives, nName, 'M', maxPriority, ignoreDirective)) {
-              attrs[nName] = trim(match[2]);
-            }
+        var match = COMMENT_DIRECTIVE_REGEXP.exec(node.nodeValue);
+        if (match) {
+          var nName = directiveNormalize(match[1]);
+          if (addDirective(directives, nName, 'M', maxPriority, ignoreDirective)) {
+            attrs[nName] = trim(match[2]);
           }
-        } catch (e) {
-          // turns out that under some circumstances IE9 throws errors when one attempts to read
-          // comment's node value.
-          // Just ignore it and continue. (Can't seem to reproduce in test case.)
         }
       }
 
@@ -11147,11 +11154,15 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
             return $sce.RESOURCE_URL;
           }
           return $sce.MEDIA_URL;
-        } else if (attrNormalizedName === 'xlinkHref') {
-          // Some xlink:href are okay, most aren't
-          if (nodeName === 'image') return $sce.MEDIA_URL;
+        } else if (attrNormalizedName === 'xlinkHref' || attrNormalizedName === 'href') {
           if (nodeName === 'a') return $sce.URL;
-          return $sce.RESOURCE_URL;
+          // CVE-2025-0716: SVG image elements should use MEDIA_URL context for href attribute
+          // to ensure proper image source sanitization
+          if (nodeName === 'image') return $sce.MEDIA_URL;
+          // Only specific elements should have href sanitized
+          if (nodeName === 'base' || nodeName === 'link') return $sce.RESOURCE_URL;
+          // For xlink:href, all other elements should use RESOURCE_URL context
+          if (attrNormalizedName === 'xlinkHref') return $sce.RESOURCE_URL;
         } else if (
           // Formaction
           (nodeName === 'form' && attrNormalizedName === 'action') ||
@@ -11165,6 +11176,13 @@ function $CompileProvider($provide, $$sanitizeUriProvider) {
         } else if (nodeName === 'a' && (attrNormalizedName === 'href' ||
           attrNormalizedName === 'ngHref')) {
           return $sce.URL;
+        } else if (nodeName === 'image' && attrNormalizedName === 'ngHref') {
+          // CVE-2025-0716: SVG image elements should use MEDIA_URL context for ngHref attribute
+          // to ensure proper image source sanitization
+          return $sce.MEDIA_URL;
+        } else if ((nodeName === 'base' || nodeName === 'link') && attrNormalizedName === 'ngHref') {
+          // base and link elements should use RESOURCE_URL context for ngHref attribute
+          return $sce.RESOURCE_URL;
         }
       }
 
@@ -13568,7 +13586,7 @@ function $HttpProvider() {
  * @param {string} url URL of the request.
  */
 function $xhrFactoryProvider() {
-  this.$get = function() {
+  this.$get = function () {
     return function createXhr() {
       return new window.XMLHttpRequest();
     };
@@ -13594,19 +13612,19 @@ function $xhrFactoryProvider() {
  * $httpBackend} which can be trained with responses.
  */
 function $HttpBackendProvider() {
-  this.$get = ['$browser', '$jsonpCallbacks', '$document', '$xhrFactory', function($browser, $jsonpCallbacks, $document, $xhrFactory) {
+  this.$get = ['$browser', '$jsonpCallbacks', '$document', '$xhrFactory', function ($browser, $jsonpCallbacks, $document, $xhrFactory) {
     return createHttpBackend($browser, $xhrFactory, $browser.defer, $jsonpCallbacks, $document[0]);
   }];
 }
 
 function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDocument) {
   // TODO(vojta): fix the signature
-  return function(method, url, post, callback, headers, timeout, withCredentials, responseType, eventHandlers, uploadEventHandlers) {
+  return function (method, url, post, callback, headers, timeout, withCredentials, responseType, eventHandlers, uploadEventHandlers) {
     url = url || $browser.url();
 
     if (lowercase(method) === 'jsonp') {
       var callbackPath = callbacks.createCallback(url);
-      var jsonpDone = jsonpReq(url, callbackPath, function(status, text) {
+      var jsonpDone = jsonpReq(url, callbackPath, function (status, text) {
         // jsonpReq only ever sets status to 200 (OK), 404 (ERROR) or -1 (WAITING)
         var response = (status === 200) && callbacks.getResponse(callbackPath);
         completeRequest(callback, status, response, '', text, 'complete');
@@ -13618,21 +13636,17 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
       var abortedByTimeout = false;
 
       xhr.open(method, url, true);
-      forEach(headers, function(value, key) {
+      forEach(headers, function (value, key) {
         if (isDefined(value)) {
-            xhr.setRequestHeader(key, value);
+          xhr.setRequestHeader(key, value);
         }
       });
 
       xhr.onload = function requestLoaded() {
         var statusText = xhr.statusText || '';
 
-        // responseText is the old-school way of retrieving response (supported by IE9)
-        // response/responseType properties were introduced in XHR Level2 spec (supported by IE10)
         var response = ('response' in xhr) ? xhr.response : xhr.responseText;
-
-        // normalize IE9 bug (http://bugs.jquery.com/ticket/1450)
-        var status = xhr.status === 1223 ? 204 : xhr.status;
+        var status = xhr.status;
 
         // fix status code when it is 0 (0 status is undocumented).
         // Occurs when accessing file resources or on Android 4.1 stock browser
@@ -13642,24 +13656,24 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
         }
 
         completeRequest(callback,
-            status,
-            response,
-            xhr.getAllResponseHeaders(),
-            statusText,
-            'complete');
+          status,
+          response,
+          xhr.getAllResponseHeaders(),
+          statusText,
+          'complete');
       };
 
-      var requestError = function() {
+      var requestError = function () {
         // The response is always empty
         // See https://xhr.spec.whatwg.org/#request-error-steps and https://fetch.spec.whatwg.org/#concept-network-error
         completeRequest(callback, -1, null, null, '', 'error');
       };
 
-      var requestAborted = function() {
+      var requestAborted = function () {
         completeRequest(callback, -1, null, null, '', abortedByTimeout ? 'timeout' : 'abort');
       };
 
-      var requestTimeout = function() {
+      var requestTimeout = function () {
         // The response is always empty
         // See https://xhr.spec.whatwg.org/#request-error-steps and https://fetch.spec.whatwg.org/#concept-network-error
         completeRequest(callback, -1, null, null, '', 'timeout');
@@ -13669,11 +13683,11 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
       xhr.ontimeout = requestTimeout;
       xhr.onabort = requestAborted;
 
-      forEach(eventHandlers, function(value, key) {
+      forEach(eventHandlers, function (value, key) {
         xhr.addEventListener(key, value);
       });
 
-      forEach(uploadEventHandlers, function(value, key) {
+      forEach(uploadEventHandlers, function (value, key) {
         xhr.upload.addEventListener(key, value);
       });
 
@@ -13710,11 +13724,11 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
     // xhr.abort()                        abort (The xhr object is normally inaccessible, but
     //                                    can be exposed with the xhrFactory)
     if (timeout > 0) {
-      var timeoutId = $browserDefer(function() {
+      var timeoutId = $browserDefer(function () {
         timeoutRequest('timeout');
       }, timeout);
     } else if (isPromiseLike(timeout)) {
-      timeout.then(function() {
+      timeout.then(function () {
         timeoutRequest(isDefined(timeout.$$timeoutId) ? 'timeout' : 'abort');
       });
     }
@@ -13750,7 +13764,7 @@ function createHttpBackend($browser, createXhr, $browserDefer, callbacks, rawDoc
     script.src = url;
     script.async = true;
 
-    callback = function(event) {
+    callback = function (event) {
       script.removeEventListener('load', callback);
       script.removeEventListener('error', callback);
       rawDocument.body.removeChild(script);
@@ -15159,8 +15173,7 @@ forEach([LocationHashbangInHtml5Url, LocationHashbangUrl, LocationHtml5Url], fun
    * The state object is later passed to `pushState` or `replaceState`.
    *
    * NOTE: This method is supported only in HTML5 mode and only in browsers supporting
-   * the HTML5 History API (i.e. methods `pushState` and `replaceState`). If you need to support
-   * older browsers (like IE9 or Android < 4.0), don't use this method.
+   * the HTML5 History API (i.e. methods `pushState` and `replaceState`).
    *
    * @param {object=} state State object for pushState or replaceState
    * @return {object} state
@@ -15622,14 +15635,14 @@ function $LogProvider() {
   };
 
   this.$get = ['$window', function($window) {
-    // Support: IE 9-11, Edge 12-14+
-    // IE/Edge display errors in such a way that it requires the user to click in 4 places
+    // Support: Edge 12-14+
+    // Edge display errors in such a way that it requires the user to click in 4 places
     // to see the stack trace. There is no way to feature-detect it so there's a chance
     // of the user agent sniffing to go wrong but since it's only about logging, this shouldn't
     // break apps. Other browsers display errors in a sensible way and some of them map stack
     // traces along source maps if available so it makes sense to let browsers display it
     // as they want.
-    var formatStackTrace = msie || /\bEdge\//.test($window.navigator && $window.navigator.userAgent);
+    var formatStackTrace = /\bEdge\//.test($window.navigator && $window.navigator.userAgent);
 
     return {
       /**
@@ -15708,10 +15721,7 @@ function $LogProvider() {
         forEach(arguments, function(arg) {
           args.push(formatError(arg));
         });
-        // Support: IE 9 only
-        // console methods don't inherit from Function.prototype in IE 9 so we can't
-        // call `logFn.apply(console, args)` directly.
-        return Function.prototype.apply.call(logFn, console, args);
+        return logFn.apply(console, args);
       };
     }
   }];
@@ -18566,22 +18576,7 @@ function $RootScopeProvider() {
 
     function cleanUpScope($scope) {
 
-      // Support: IE 9 only
-      if (msie === 9) {
-        // There is a memory leak in IE9 if all child scopes are not disconnected
-        // completely when a scope is destroyed. So this code will recurse up through
-        // all this scopes children
-        //
-        // See issue https://github.com/angular/angular.js/issues/10706
-        if ($scope.$$childHead) {
-          cleanUpScope($scope.$$childHead);
-        }
-        if ($scope.$$nextSibling) {
-          cleanUpScope($scope.$$nextSibling);
-        }
-      }
-
-      // The code below works around IE9 and V8's memory leaks
+      // The code below works around V8's memory leaks
       //
       // See:
       // - https://code.google.com/p/v8/issues/detail?id=2073#c26
@@ -20943,15 +20938,6 @@ function $SceProvider() {
 
   this.$get = ['$parse', '$sceDelegate', function(
                 $parse,   $sceDelegate) {
-    // Support: IE 9-11 only
-    // Prereq: Ensure that we're not running in IE<11 quirks mode.  In that mode, IE < 11 allow
-    // the "expression(javascript expression)" syntax which is insecure.
-    if (enabled && msie < 8) {
-      throw $sceMinErr('iequirks',
-        'Strict Contextual Escaping does not support Internet Explorer version < 11 in quirks ' +
-        'mode.  You can fix this by adding the text <!doctype html> to the top of your HTML ' +
-        'document.  See http://docs.angularjs.org/api/ng.$sce for more information.');
-    }
 
     var sce = shallowCopy(SCE_CONTEXTS);
 
@@ -21343,13 +21329,6 @@ function $SnifferProvider() {
       // We are purposefully using `!(android < 4)` to cover the case when `android` is undefined
       history: !!(hasHistoryPushState && !(android < 4) && !boxee),
       hasEvent: function(event) {
-        // Support: IE 9-11 only
-        // IE9 implements 'input' event it's so fubared that we rather pretend that it doesn't have
-        // it. In particular the event is not fired when backspace or delete key are pressed or
-        // when cut operation is performed.
-        // IE10+ implements 'input' event but it erroneously fires under various situations,
-        // e.g. when placeholder changes, or a form is focused.
-        if (event === 'input' && msie) return false;
 
         if (isUndefined(eventSupport[event])) {
           var divElm = document.createElement('div');
@@ -21859,8 +21838,8 @@ var baseUrlParsingNode;
 
 urlParsingNode.href = 'http://[::1]';
 
-// Support: IE 9-11 only, Edge 16-17 only (fixed in 18 Preview)
-// IE/Edge don't wrap IPv6 addresses' hostnames in square brackets
+// Support: Edge 16-17 only (fixed in 18 Preview)
+// Edge don't wrap IPv6 addresses' hostnames in square brackets
 // when parsed out of an anchor element.
 var ipv6InBrackets = urlParsingNode.hostname === '[::1]';
 
@@ -21914,14 +21893,6 @@ function urlResolve(url) {
   if (!isString(url)) return url;
 
   var href = url;
-
-  // Support: IE 9-11 only
-  if (msie) {
-    // Normalize before parse.  Refer Implementation Notes on why this is
-    // done in two steps on IE.
-    urlParsingNode.setAttribute('href', href);
-    href = urlParsingNode.href;
-  }
 
   urlParsingNode.setAttribute('href', href);
 
@@ -22659,7 +22630,8 @@ function currencyFilter($locale) {
     }
 
     // If the currency symbol is empty, trim whitespace around the symbol
-    var currencySymbolRe = !currencySymbol ? /\s*\u00A4\s*/g : /\u00A4/g;
+    // CVE-2022-25844 fix: Limit whitespace matching to prevent ReDoS
+    var currencySymbolRe = !currencySymbol ? /\s{0,50}\u00A4\s{0,50}/g : /\u00A4/g;
 
     // if null or undefined pass it through
     return (amount == null)
@@ -22862,6 +22834,25 @@ function roundNumber(parsedNumber, fractionSize, minFrac, maxFrac) {
 }
 
 /**
+ * Sanitize pattern strings to prevent ReDoS attacks (CVE-2022-25844)
+ * @param  {string} str The pattern string to sanitize
+ * @return {string}     The sanitized pattern string
+ */
+function sanitizePatternString(str) {
+  if (!isString(str)) return '';
+  
+  // Limit maximum length to prevent ReDoS attacks
+  var MAX_PATTERN_LENGTH = 100;
+  if (str.length > MAX_PATTERN_LENGTH) {
+    return str.substring(0, MAX_PATTERN_LENGTH);
+  }
+  
+  // Remove any JavaScript function calls that could cause ReDoS
+  // This prevents patterns like ' '.repeat(999999) or similar attacks
+  return str.replace(/[a-zA-Z_$][a-zA-Z0-9_$]*\s*\([^)]*\)/g, '');
+}
+
+/**
  * Format a number into a string
  * @param  {number} number       The number to format
  * @param  {{
@@ -22888,6 +22879,12 @@ function formatNumber(number, pattern, groupSep, decimalSep, fractionSize) {
   var numStr = Math.abs(number) + '',
       formattedText = '',
       parsedNumber;
+
+  // Sanitize pattern strings to prevent ReDoS attacks (CVE-2022-25844)
+  var safePosPre = sanitizePatternString(pattern.posPre);
+  var safePosSuf = sanitizePatternString(pattern.posSuf);
+  var safeNegPre = sanitizePatternString(pattern.negPre);
+  var safeNegSuf = sanitizePatternString(pattern.negSuf);
 
   if (isInfinity) {
     formattedText = '\u221e';
@@ -22939,9 +22936,9 @@ function formatNumber(number, pattern, groupSep, decimalSep, fractionSize) {
     }
   }
   if (number < 0 && !isZero) {
-    return pattern.negPre + formattedText + pattern.negSuf;
+    return safeNegPre + formattedText + safeNegSuf;
   } else {
-    return pattern.posPre + formattedText + pattern.posSuf;
+    return safePosPre + formattedText + safePosSuf;
   }
 }
 
@@ -24525,10 +24522,6 @@ var htmlAnchorDirective = valueFn({
  * A special directive is necessary because we cannot use interpolation inside the `open`
  * attribute. See the {@link guide/interpolation interpolation guide} for more info.
  *
- * ## A note about browser compatibility
- *
- * Internet Explorer and Edge do not support the `details` element, it is
- * recommended to use {@link ng.ngShow} and {@link ng.ngHide} instead.
  *
  * @example
      <example name="ng-open">
@@ -24632,9 +24625,15 @@ forEach(['src', 'srcset', 'href'], function(attrName) {
           propName = null;
         }
 
+        // CVE-2024-8372 FIX: For srcset, don't use getTrustedMediaUrl() as it doesn't
+        // properly parse multiple URLs. Let $set() handle it via sanitizeSrcset().
         // We need to sanitize the url at least once, in case it is a constant
         // non-interpolated attribute.
-        attr.$set(normalized, $sce.getTrustedMediaUrl(attr[normalized]));
+        if (attrName === 'srcset') {
+          attr.$set(normalized, attr[normalized]);
+        } else {
+          attr.$set(normalized, $sce.getTrustedMediaUrl(attr[normalized]));
+        }
 
         attr.$observe(normalized, function(value) {
           if (!value) {
@@ -24646,12 +24645,6 @@ forEach(['src', 'srcset', 'href'], function(attrName) {
 
           attr.$set(name, value);
 
-          // Support: IE 9-11 only
-          // On IE, if "ng:src" directive declaration is used and "src" attribute doesn't exist
-          // then calling element.setAttribute('src', 'foo') doesn't do anything, so we need
-          // to set the property as well to achieve the desired effect.
-          // We use attr[attrName] value since $set might have sanitized the url.
-          if (msie && propName) element.prop(propName, attr[name]);
         });
       }
     };
@@ -25408,7 +25401,16 @@ var ISO_DATE_REGEXP = /^\d{4,}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+(?:[+-
 //   8. Query
 //   9. Fragment
 //                 1111111111111111 222   333333    44444        55555555555555555555555     666     77777777     8888888     999
-var URL_REGEXP = /^[a-z][a-z\d.+-]*:\/*(?:[^:@]+(?::[^@]+)?@)?(?:[^\s:/?#]+|\[[a-f\d:]+])(?::\d+)?(?:\/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$/i;
+
+// PATCH: Limit the number of forward slashes following the URL scheme.
+// Previously this used an unbounded repetition (\/\*), which could lead
+// to catastrophic backtracking and a Regular Expression Denial of Service (ReDoS)
+// when processing crafted, very long URLs.
+// The scheme separator in valid URLs allows at most two slashes (e.g. "://"),
+// so this change preserves correct behavior while mitigating CVE-2023-26118.
+var URL_REGEXP = /^[a-z][a-z\d.+-]*:(?:|\/|\/\/|\/\/\/)(?:[^:@]+(?::[^@]+)?@)?(?:[^\s:/?#]+|\[[a-f\d:]+])(?::\d+)?(?:\/[^?#]*)?(?:\?[^#]*)?(?:#.*)?$/i;
+
+
 // eslint-disable-next-line max-len
 var EMAIL_REGEXP = /^(?=.{1,254}$)(?=.{1,64}@)[-!#$%&'*+/0-9=?A-Z^_`a-z{|}~]+(\.[-!#$%&'*+/0-9=?A-Z^_`a-z{|}~]+)*@[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/;
 var NUMBER_REGEXP = /^\s*(-|\+)?(\d+|(\d*(\.\d*)))([eE][+-]?\d+)?\s*$/;
@@ -25420,7 +25422,7 @@ var TIME_REGEXP = /^(\d\d):(\d\d)(?::(\d\d)(\.\d{1,3})?)?$/;
 
 var PARTIAL_VALIDATION_EVENTS = 'keydown wheel mousedown';
 var PARTIAL_VALIDATION_TYPES = createMap();
-forEach('date,datetime-local,month,time,week'.split(','), function(type) {
+forEach('date,datetime-local,month,time,week'.split(','), function (type) {
   PARTIAL_VALIDATION_TYPES[type] = true;
 });
 
@@ -25522,185 +25524,79 @@ var inputType = {
    */
   'text': textInputType,
 
-    /**
-     * @ngdoc input
-     * @name input[date]
-     *
-     * @description
-     * Input with date validation and transformation. In browsers that do not yet support
-     * the HTML5 date input, a text element will be used. In that case, text must be entered in a valid ISO-8601
-     * date format (yyyy-MM-dd), for example: `2009-01-06`. Since many
-     * modern browsers do not yet support this input type, it is important to provide cues to users on the
-     * expected input format via a placeholder or label.
-     *
-     * The model must always be a Date object, otherwise AngularJS will throw an error.
-     * Invalid `Date` objects (dates whose `getTime()` is `NaN`) will be rendered as an empty string.
-     *
-     * The timezone to be used to read/write the `Date` instance in the model can be defined using
-     * {@link ng.directive:ngModelOptions ngModelOptions}. By default, this is the timezone of the browser.
-     *
-     * @param {string} ngModel Assignable AngularJS expression to data-bind to.
-     * @param {string=} name Property name of the form under which the control is published.
-     * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`. This must be a
-     *   valid ISO date string (yyyy-MM-dd). You can also use interpolation inside this attribute
-     *   (e.g. `min="{{minDate | date:'yyyy-MM-dd'}}"`). Note that `min` will also add native HTML5
-     *   constraint validation.
-     * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`. This must be
-     *   a valid ISO date string (yyyy-MM-dd). You can also use interpolation inside this attribute
-     *   (e.g. `max="{{maxDate | date:'yyyy-MM-dd'}}"`). Note that `max` will also add native HTML5
-     *   constraint validation.
-     * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO date string
-     *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
-     * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO date string
-     *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
-     * @param {string=} required Sets `required` validation error key if the value is not entered.
-     * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
-     *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
-     *    `required` when you want to data-bind to the `required` attribute.
-     * @param {string=} ngChange AngularJS expression to be executed when input changes due to user
-     *    interaction with the input element.
-     *
-     * @example
-     <example name="date-input-directive" module="dateInputExample">
-     <file name="index.html">
-       <script>
-          angular.module('dateInputExample', [])
-            .controller('DateController', ['$scope', function($scope) {
-              $scope.example = {
-                value: new Date(2013, 9, 22)
-              };
-            }]);
-       </script>
-       <form name="myForm" ng-controller="DateController as dateCtrl">
-          <label for="exampleInput">Pick a date in 2013:</label>
-          <input type="date" id="exampleInput" name="input" ng-model="example.value"
-              placeholder="yyyy-MM-dd" min="2013-01-01" max="2013-12-31" required />
-          <div role="alert">
-            <span class="error" ng-show="myForm.input.$error.required">
-                Required!</span>
-            <span class="error" ng-show="myForm.input.$error.date">
-                Not a valid date!</span>
-           </div>
-           <tt>value = {{example.value | date: "yyyy-MM-dd"}}</tt><br/>
-           <tt>myForm.input.$valid = {{myForm.input.$valid}}</tt><br/>
-           <tt>myForm.input.$error = {{myForm.input.$error}}</tt><br/>
-           <tt>myForm.$valid = {{myForm.$valid}}</tt><br/>
-           <tt>myForm.$error.required = {{!!myForm.$error.required}}</tt><br/>
-       </form>
-     </file>
-     <file name="protractor.js" type="protractor">
-        var value = element(by.binding('example.value | date: "yyyy-MM-dd"'));
-        var valid = element(by.binding('myForm.input.$valid'));
-
-        // currently protractor/webdriver does not support
-        // sending keys to all known HTML5 input controls
-        // for various browsers (see https://github.com/angular/protractor/issues/562).
-        function setInput(val) {
-          // set the value of the element and force validation.
-          var scr = "var ipt = document.getElementById('exampleInput'); " +
-          "ipt.value = '" + val + "';" +
-          "angular.element(ipt).scope().$apply(function(s) { s.myForm[ipt.name].$setViewValue('" + val + "'); });";
-          browser.executeScript(scr);
-        }
-
-        it('should initialize to model', function() {
-          expect(value.getText()).toContain('2013-10-22');
-          expect(valid.getText()).toContain('myForm.input.$valid = true');
-        });
-
-        it('should be invalid if empty', function() {
-          setInput('');
-          expect(value.getText()).toEqual('value =');
-          expect(valid.getText()).toContain('myForm.input.$valid = false');
-        });
-
-        it('should be invalid if over max', function() {
-          setInput('2015-01-01');
-          expect(value.getText()).toContain('');
-          expect(valid.getText()).toContain('myForm.input.$valid = false');
-        });
-     </file>
-     </example>
-     */
-  'date': createDateInputType('date', DATE_REGEXP,
-         createDateParser(DATE_REGEXP, ['yyyy', 'MM', 'dd']),
-         'yyyy-MM-dd'),
-
-   /**
-    * @ngdoc input
-    * @name input[datetime-local]
-    *
-    * @description
-    * Input with datetime validation and transformation. In browsers that do not yet support
-    * the HTML5 date input, a text element will be used. In that case, the text must be entered in a valid ISO-8601
-    * local datetime format (yyyy-MM-ddTHH:mm:ss), for example: `2010-12-28T14:57:00`.
-    *
-    * The model must always be a Date object, otherwise AngularJS will throw an error.
-    * Invalid `Date` objects (dates whose `getTime()` is `NaN`) will be rendered as an empty string.
-    *
-    * The timezone to be used to read/write the `Date` instance in the model can be defined using
-    * {@link ng.directive:ngModelOptions ngModelOptions}. By default, this is the timezone of the browser.
-    *
-    * The format of the displayed time can be adjusted with the
-    * {@link ng.directive:ngModelOptions#ngModelOptions-arguments ngModelOptions} `timeSecondsFormat`
-    * and `timeStripZeroSeconds`.
-    *
-    * @param {string} ngModel Assignable AngularJS expression to data-bind to.
-    * @param {string=} name Property name of the form under which the control is published.
-    * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
-    *   This must be a valid ISO datetime format (yyyy-MM-ddTHH:mm:ss). You can also use interpolation
-    *   inside this attribute (e.g. `min="{{minDatetimeLocal | date:'yyyy-MM-ddTHH:mm:ss'}}"`).
-    *   Note that `min` will also add native HTML5 constraint validation.
-    * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
-    *   This must be a valid ISO datetime format (yyyy-MM-ddTHH:mm:ss). You can also use interpolation
-    *   inside this attribute (e.g. `max="{{maxDatetimeLocal | date:'yyyy-MM-ddTHH:mm:ss'}}"`).
-    *   Note that `max` will also add native HTML5 constraint validation.
-    * @param {(date|string)=} ngMin Sets the `min` validation error key to the Date / ISO datetime string
-    *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
-    * @param {(date|string)=} ngMax Sets the `max` validation error key to the Date / ISO datetime string
-    *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
-    * @param {string=} required Sets `required` validation error key if the value is not entered.
-    * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
-    *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
-    *    `required` when you want to data-bind to the `required` attribute.
-    * @param {string=} ngChange AngularJS expression to be executed when input changes due to user
-    *    interaction with the input element.
-    *
-    * @example
-    <example name="datetimelocal-input-directive" module="dateExample">
-    <file name="index.html">
-      <script>
-        angular.module('dateExample', [])
+  /**
+   * @ngdoc input
+   * @name input[date]
+   *
+   * @description
+   * Input with date validation and transformation. In browsers that do not yet support
+   * the HTML5 date input, a text element will be used. In that case, text must be entered in a valid ISO-8601
+   * date format (yyyy-MM-dd), for example: `2009-01-06`. Since many
+   * modern browsers do not yet support this input type, it is important to provide cues to users on the
+   * expected input format via a placeholder or label.
+   *
+   * The model must always be a Date object, otherwise AngularJS will throw an error.
+   * Invalid `Date` objects (dates whose `getTime()` is `NaN`) will be rendered as an empty string.
+   *
+   * The timezone to be used to read/write the `Date` instance in the model can be defined using
+   * {@link ng.directive:ngModelOptions ngModelOptions}. By default, this is the timezone of the browser.
+   *
+   * @param {string} ngModel Assignable AngularJS expression to data-bind to.
+   * @param {string=} name Property name of the form under which the control is published.
+   * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`. This must be a
+   *   valid ISO date string (yyyy-MM-dd). You can also use interpolation inside this attribute
+   *   (e.g. `min="{{minDate | date:'yyyy-MM-dd'}}"`). Note that `min` will also add native HTML5
+   *   constraint validation.
+   * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`. This must be
+   *   a valid ISO date string (yyyy-MM-dd). You can also use interpolation inside this attribute
+   *   (e.g. `max="{{maxDate | date:'yyyy-MM-dd'}}"`). Note that `max` will also add native HTML5
+   *   constraint validation.
+   * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO date string
+   *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+   * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO date string
+   *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
+   * @param {string=} required Sets `required` validation error key if the value is not entered.
+   * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
+   *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
+   *    `required` when you want to data-bind to the `required` attribute.
+   * @param {string=} ngChange AngularJS expression to be executed when input changes due to user
+   *    interaction with the input element.
+   *
+   * @example
+   <example name="date-input-directive" module="dateInputExample">
+   <file name="index.html">
+     <script>
+        angular.module('dateInputExample', [])
           .controller('DateController', ['$scope', function($scope) {
             $scope.example = {
-              value: new Date(2010, 11, 28, 14, 57)
+              value: new Date(2013, 9, 22)
             };
           }]);
-      </script>
-      <form name="myForm" ng-controller="DateController as dateCtrl">
-        <label for="exampleInput">Pick a date between in 2013:</label>
-        <input type="datetime-local" id="exampleInput" name="input" ng-model="example.value"
-            placeholder="yyyy-MM-ddTHH:mm:ss" min="2001-01-01T00:00:00" max="2013-12-31T00:00:00" required />
+     </script>
+     <form name="myForm" ng-controller="DateController as dateCtrl">
+        <label for="exampleInput">Pick a date in 2013:</label>
+        <input type="date" id="exampleInput" name="input" ng-model="example.value"
+            placeholder="yyyy-MM-dd" min="2013-01-01" max="2013-12-31" required />
         <div role="alert">
           <span class="error" ng-show="myForm.input.$error.required">
               Required!</span>
-          <span class="error" ng-show="myForm.input.$error.datetimelocal">
+          <span class="error" ng-show="myForm.input.$error.date">
               Not a valid date!</span>
-        </div>
-        <tt>value = {{example.value | date: "yyyy-MM-ddTHH:mm:ss"}}</tt><br/>
-        <tt>myForm.input.$valid = {{myForm.input.$valid}}</tt><br/>
-        <tt>myForm.input.$error = {{myForm.input.$error}}</tt><br/>
-        <tt>myForm.$valid = {{myForm.$valid}}</tt><br/>
-        <tt>myForm.$error.required = {{!!myForm.$error.required}}</tt><br/>
-      </form>
-    </file>
-    <file name="protractor.js" type="protractor">
-      var value = element(by.binding('example.value | date: "yyyy-MM-ddTHH:mm:ss"'));
+         </div>
+         <tt>value = {{example.value | date: "yyyy-MM-dd"}}</tt><br/>
+         <tt>myForm.input.$valid = {{myForm.input.$valid}}</tt><br/>
+         <tt>myForm.input.$error = {{myForm.input.$error}}</tt><br/>
+         <tt>myForm.$valid = {{myForm.$valid}}</tt><br/>
+         <tt>myForm.$error.required = {{!!myForm.$error.required}}</tt><br/>
+     </form>
+   </file>
+   <file name="protractor.js" type="protractor">
+      var value = element(by.binding('example.value | date: "yyyy-MM-dd"'));
       var valid = element(by.binding('myForm.input.$valid'));
 
       // currently protractor/webdriver does not support
       // sending keys to all known HTML5 input controls
-      // for various browsers (https://github.com/angular/protractor/issues/562).
+      // for various browsers (see https://github.com/angular/protractor/issues/562).
       function setInput(val) {
         // set the value of the element and force validation.
         var scr = "var ipt = document.getElementById('exampleInput'); " +
@@ -25710,7 +25606,7 @@ var inputType = {
       }
 
       it('should initialize to model', function() {
-        expect(value.getText()).toContain('2010-12-28T14:57:00');
+        expect(value.getText()).toContain('2013-10-22');
         expect(valid.getText()).toContain('myForm.input.$valid = true');
       });
 
@@ -25721,16 +25617,122 @@ var inputType = {
       });
 
       it('should be invalid if over max', function() {
-        setInput('2015-01-01T23:59:00');
+        setInput('2015-01-01');
         expect(value.getText()).toContain('');
         expect(valid.getText()).toContain('myForm.input.$valid = false');
       });
-    </file>
-    </example>
-    */
+   </file>
+   </example>
+   */
+  'date': createDateInputType('date', DATE_REGEXP,
+    createDateParser(DATE_REGEXP, ['yyyy', 'MM', 'dd']),
+    'yyyy-MM-dd'),
+
+  /**
+   * @ngdoc input
+   * @name input[datetime-local]
+   *
+   * @description
+   * Input with datetime validation and transformation. In browsers that do not yet support
+   * the HTML5 date input, a text element will be used. In that case, the text must be entered in a valid ISO-8601
+   * local datetime format (yyyy-MM-ddTHH:mm:ss), for example: `2010-12-28T14:57:00`.
+   *
+   * The model must always be a Date object, otherwise AngularJS will throw an error.
+   * Invalid `Date` objects (dates whose `getTime()` is `NaN`) will be rendered as an empty string.
+   *
+   * The timezone to be used to read/write the `Date` instance in the model can be defined using
+   * {@link ng.directive:ngModelOptions ngModelOptions}. By default, this is the timezone of the browser.
+   *
+   * The format of the displayed time can be adjusted with the
+   * {@link ng.directive:ngModelOptions#ngModelOptions-arguments ngModelOptions} `timeSecondsFormat`
+   * and `timeStripZeroSeconds`.
+   *
+   * @param {string} ngModel Assignable AngularJS expression to data-bind to.
+   * @param {string=} name Property name of the form under which the control is published.
+   * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
+   *   This must be a valid ISO datetime format (yyyy-MM-ddTHH:mm:ss). You can also use interpolation
+   *   inside this attribute (e.g. `min="{{minDatetimeLocal | date:'yyyy-MM-ddTHH:mm:ss'}}"`).
+   *   Note that `min` will also add native HTML5 constraint validation.
+   * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
+   *   This must be a valid ISO datetime format (yyyy-MM-ddTHH:mm:ss). You can also use interpolation
+   *   inside this attribute (e.g. `max="{{maxDatetimeLocal | date:'yyyy-MM-ddTHH:mm:ss'}}"`).
+   *   Note that `max` will also add native HTML5 constraint validation.
+   * @param {(date|string)=} ngMin Sets the `min` validation error key to the Date / ISO datetime string
+   *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+   * @param {(date|string)=} ngMax Sets the `max` validation error key to the Date / ISO datetime string
+   *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
+   * @param {string=} required Sets `required` validation error key if the value is not entered.
+   * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
+   *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
+   *    `required` when you want to data-bind to the `required` attribute.
+   * @param {string=} ngChange AngularJS expression to be executed when input changes due to user
+   *    interaction with the input element.
+   *
+   * @example
+   <example name="datetimelocal-input-directive" module="dateExample">
+   <file name="index.html">
+     <script>
+       angular.module('dateExample', [])
+         .controller('DateController', ['$scope', function($scope) {
+           $scope.example = {
+             value: new Date(2010, 11, 28, 14, 57)
+           };
+         }]);
+     </script>
+     <form name="myForm" ng-controller="DateController as dateCtrl">
+       <label for="exampleInput">Pick a date between in 2013:</label>
+       <input type="datetime-local" id="exampleInput" name="input" ng-model="example.value"
+           placeholder="yyyy-MM-ddTHH:mm:ss" min="2001-01-01T00:00:00" max="2013-12-31T00:00:00" required />
+       <div role="alert">
+         <span class="error" ng-show="myForm.input.$error.required">
+             Required!</span>
+         <span class="error" ng-show="myForm.input.$error.datetimelocal">
+             Not a valid date!</span>
+       </div>
+       <tt>value = {{example.value | date: "yyyy-MM-ddTHH:mm:ss"}}</tt><br/>
+       <tt>myForm.input.$valid = {{myForm.input.$valid}}</tt><br/>
+       <tt>myForm.input.$error = {{myForm.input.$error}}</tt><br/>
+       <tt>myForm.$valid = {{myForm.$valid}}</tt><br/>
+       <tt>myForm.$error.required = {{!!myForm.$error.required}}</tt><br/>
+     </form>
+   </file>
+   <file name="protractor.js" type="protractor">
+     var value = element(by.binding('example.value | date: "yyyy-MM-ddTHH:mm:ss"'));
+     var valid = element(by.binding('myForm.input.$valid'));
+
+     // currently protractor/webdriver does not support
+     // sending keys to all known HTML5 input controls
+     // for various browsers (https://github.com/angular/protractor/issues/562).
+     function setInput(val) {
+       // set the value of the element and force validation.
+       var scr = "var ipt = document.getElementById('exampleInput'); " +
+       "ipt.value = '" + val + "';" +
+       "angular.element(ipt).scope().$apply(function(s) { s.myForm[ipt.name].$setViewValue('" + val + "'); });";
+       browser.executeScript(scr);
+     }
+
+     it('should initialize to model', function() {
+       expect(value.getText()).toContain('2010-12-28T14:57:00');
+       expect(valid.getText()).toContain('myForm.input.$valid = true');
+     });
+
+     it('should be invalid if empty', function() {
+       setInput('');
+       expect(value.getText()).toEqual('value =');
+       expect(valid.getText()).toContain('myForm.input.$valid = false');
+     });
+
+     it('should be invalid if over max', function() {
+       setInput('2015-01-01T23:59:00');
+       expect(value.getText()).toContain('');
+       expect(valid.getText()).toContain('myForm.input.$valid = false');
+     });
+   </file>
+   </example>
+   */
   'datetime-local': createDateInputType('datetimelocal', DATETIMELOCAL_REGEXP,
-      createDateParser(DATETIMELOCAL_REGEXP, ['yyyy', 'MM', 'dd', 'HH', 'mm', 'ss', 'sss']),
-      'yyyy-MM-ddTHH:mm:ss.sss'),
+    createDateParser(DATETIMELOCAL_REGEXP, ['yyyy', 'MM', 'dd', 'HH', 'mm', 'ss', 'sss']),
+    'yyyy-MM-ddTHH:mm:ss.sss'),
 
   /**
    * @ngdoc input
@@ -25837,113 +25839,113 @@ var inputType = {
    </example>
    */
   'time': createDateInputType('time', TIME_REGEXP,
-      createDateParser(TIME_REGEXP, ['HH', 'mm', 'ss', 'sss']),
-     'HH:mm:ss.sss'),
+    createDateParser(TIME_REGEXP, ['HH', 'mm', 'ss', 'sss']),
+    'HH:mm:ss.sss'),
 
-   /**
-    * @ngdoc input
-    * @name input[week]
-    *
-    * @description
-    * Input with week-of-the-year validation and transformation to Date. In browsers that do not yet support
-    * the HTML5 week input, a text element will be used. In that case, the text must be entered in a valid ISO-8601
-    * week format (yyyy-W##), for example: `2013-W02`.
-    *
-    * The model must always be a Date object, otherwise AngularJS will throw an error.
-    * Invalid `Date` objects (dates whose `getTime()` is `NaN`) will be rendered as an empty string.
-    *
-    * The value of the resulting Date object will be set to Thursday at 00:00:00 of the requested week,
-    * due to ISO-8601 week numbering standards. Information on ISO's system for numbering the weeks of the
-    * year can be found at: https://en.wikipedia.org/wiki/ISO_8601#Week_dates
-    *
-    * The timezone to be used to read/write the `Date` instance in the model can be defined using
-    * {@link ng.directive:ngModelOptions ngModelOptions}. By default, this is the timezone of the browser.
-    *
-    * @param {string} ngModel Assignable AngularJS expression to data-bind to.
-    * @param {string=} name Property name of the form under which the control is published.
-    * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
-    *   This must be a valid ISO week format (yyyy-W##). You can also use interpolation inside this
-    *   attribute (e.g. `min="{{minWeek | date:'yyyy-Www'}}"`). Note that `min` will also add
-    *   native HTML5 constraint validation.
-    * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
-    *   This must be a valid ISO week format (yyyy-W##). You can also use interpolation inside this
-    *   attribute (e.g. `max="{{maxWeek | date:'yyyy-Www'}}"`). Note that `max` will also add
-    *   native HTML5 constraint validation.
-    * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO week string
-    *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
-    * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO week string
-    *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
-    * @param {string=} required Sets `required` validation error key if the value is not entered.
-    * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
-    *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
-    *    `required` when you want to data-bind to the `required` attribute.
-    * @param {string=} ngChange AngularJS expression to be executed when input changes due to user
-    *    interaction with the input element.
-    *
-    * @example
-    <example name="week-input-directive" module="weekExample">
-    <file name="index.html">
-      <script>
-      angular.module('weekExample', [])
-        .controller('DateController', ['$scope', function($scope) {
-          $scope.example = {
-            value: new Date(2013, 0, 3)
-          };
-        }]);
-      </script>
-      <form name="myForm" ng-controller="DateController as dateCtrl">
-        <label>Pick a date between in 2013:
-          <input id="exampleInput" type="week" name="input" ng-model="example.value"
-                 placeholder="YYYY-W##" min="2012-W32"
-                 max="2013-W52" required />
-        </label>
-        <div role="alert">
-          <span class="error" ng-show="myForm.input.$error.required">
-              Required!</span>
-          <span class="error" ng-show="myForm.input.$error.week">
-              Not a valid date!</span>
-        </div>
-        <tt>value = {{example.value | date: "yyyy-Www"}}</tt><br/>
-        <tt>myForm.input.$valid = {{myForm.input.$valid}}</tt><br/>
-        <tt>myForm.input.$error = {{myForm.input.$error}}</tt><br/>
-        <tt>myForm.$valid = {{myForm.$valid}}</tt><br/>
-        <tt>myForm.$error.required = {{!!myForm.$error.required}}</tt><br/>
-      </form>
-    </file>
-    <file name="protractor.js" type="protractor">
-      var value = element(by.binding('example.value | date: "yyyy-Www"'));
-      var valid = element(by.binding('myForm.input.$valid'));
+  /**
+   * @ngdoc input
+   * @name input[week]
+   *
+   * @description
+   * Input with week-of-the-year validation and transformation to Date. In browsers that do not yet support
+   * the HTML5 week input, a text element will be used. In that case, the text must be entered in a valid ISO-8601
+   * week format (yyyy-W##), for example: `2013-W02`.
+   *
+   * The model must always be a Date object, otherwise AngularJS will throw an error.
+   * Invalid `Date` objects (dates whose `getTime()` is `NaN`) will be rendered as an empty string.
+   *
+   * The value of the resulting Date object will be set to Thursday at 00:00:00 of the requested week,
+   * due to ISO-8601 week numbering standards. Information on ISO's system for numbering the weeks of the
+   * year can be found at: https://en.wikipedia.org/wiki/ISO_8601#Week_dates
+   *
+   * The timezone to be used to read/write the `Date` instance in the model can be defined using
+   * {@link ng.directive:ngModelOptions ngModelOptions}. By default, this is the timezone of the browser.
+   *
+   * @param {string} ngModel Assignable AngularJS expression to data-bind to.
+   * @param {string=} name Property name of the form under which the control is published.
+   * @param {string=} min Sets the `min` validation error key if the value entered is less than `min`.
+   *   This must be a valid ISO week format (yyyy-W##). You can also use interpolation inside this
+   *   attribute (e.g. `min="{{minWeek | date:'yyyy-Www'}}"`). Note that `min` will also add
+   *   native HTML5 constraint validation.
+   * @param {string=} max Sets the `max` validation error key if the value entered is greater than `max`.
+   *   This must be a valid ISO week format (yyyy-W##). You can also use interpolation inside this
+   *   attribute (e.g. `max="{{maxWeek | date:'yyyy-Www'}}"`). Note that `max` will also add
+   *   native HTML5 constraint validation.
+   * @param {(date|string)=} ngMin Sets the `min` validation constraint to the Date / ISO week string
+   *   the `ngMin` expression evaluates to. Note that it does not set the `min` attribute.
+   * @param {(date|string)=} ngMax Sets the `max` validation constraint to the Date / ISO week string
+   *   the `ngMax` expression evaluates to. Note that it does not set the `max` attribute.
+   * @param {string=} required Sets `required` validation error key if the value is not entered.
+   * @param {string=} ngRequired Adds `required` attribute and `required` validation constraint to
+   *    the element when the ngRequired expression evaluates to true. Use `ngRequired` instead of
+   *    `required` when you want to data-bind to the `required` attribute.
+   * @param {string=} ngChange AngularJS expression to be executed when input changes due to user
+   *    interaction with the input element.
+   *
+   * @example
+   <example name="week-input-directive" module="weekExample">
+   <file name="index.html">
+     <script>
+     angular.module('weekExample', [])
+       .controller('DateController', ['$scope', function($scope) {
+         $scope.example = {
+           value: new Date(2013, 0, 3)
+         };
+       }]);
+     </script>
+     <form name="myForm" ng-controller="DateController as dateCtrl">
+       <label>Pick a date between in 2013:
+         <input id="exampleInput" type="week" name="input" ng-model="example.value"
+                placeholder="YYYY-W##" min="2012-W32"
+                max="2013-W52" required />
+       </label>
+       <div role="alert">
+         <span class="error" ng-show="myForm.input.$error.required">
+             Required!</span>
+         <span class="error" ng-show="myForm.input.$error.week">
+             Not a valid date!</span>
+       </div>
+       <tt>value = {{example.value | date: "yyyy-Www"}}</tt><br/>
+       <tt>myForm.input.$valid = {{myForm.input.$valid}}</tt><br/>
+       <tt>myForm.input.$error = {{myForm.input.$error}}</tt><br/>
+       <tt>myForm.$valid = {{myForm.$valid}}</tt><br/>
+       <tt>myForm.$error.required = {{!!myForm.$error.required}}</tt><br/>
+     </form>
+   </file>
+   <file name="protractor.js" type="protractor">
+     var value = element(by.binding('example.value | date: "yyyy-Www"'));
+     var valid = element(by.binding('myForm.input.$valid'));
 
-      // currently protractor/webdriver does not support
-      // sending keys to all known HTML5 input controls
-      // for various browsers (https://github.com/angular/protractor/issues/562).
-      function setInput(val) {
-        // set the value of the element and force validation.
-        var scr = "var ipt = document.getElementById('exampleInput'); " +
-        "ipt.value = '" + val + "';" +
-        "angular.element(ipt).scope().$apply(function(s) { s.myForm[ipt.name].$setViewValue('" + val + "'); });";
-        browser.executeScript(scr);
-      }
+     // currently protractor/webdriver does not support
+     // sending keys to all known HTML5 input controls
+     // for various browsers (https://github.com/angular/protractor/issues/562).
+     function setInput(val) {
+       // set the value of the element and force validation.
+       var scr = "var ipt = document.getElementById('exampleInput'); " +
+       "ipt.value = '" + val + "';" +
+       "angular.element(ipt).scope().$apply(function(s) { s.myForm[ipt.name].$setViewValue('" + val + "'); });";
+       browser.executeScript(scr);
+     }
 
-      it('should initialize to model', function() {
-        expect(value.getText()).toContain('2013-W01');
-        expect(valid.getText()).toContain('myForm.input.$valid = true');
-      });
+     it('should initialize to model', function() {
+       expect(value.getText()).toContain('2013-W01');
+       expect(valid.getText()).toContain('myForm.input.$valid = true');
+     });
 
-      it('should be invalid if empty', function() {
-        setInput('');
-        expect(value.getText()).toEqual('value =');
-        expect(valid.getText()).toContain('myForm.input.$valid = false');
-      });
+     it('should be invalid if empty', function() {
+       setInput('');
+       expect(value.getText()).toEqual('value =');
+       expect(valid.getText()).toContain('myForm.input.$valid = false');
+     });
 
-      it('should be invalid if over max', function() {
-        setInput('2015-W01');
-        expect(value.getText()).toContain('');
-        expect(valid.getText()).toContain('myForm.input.$valid = false');
-      });
-    </file>
-    </example>
-    */
+     it('should be invalid if over max', function() {
+       setInput('2015-W01');
+       expect(value.getText()).toContain('');
+       expect(valid.getText()).toContain('myForm.input.$valid = false');
+     });
+   </file>
+   </example>
+   */
   'week': createDateInputType('week', WEEK_REGEXP, weekParser, 'yyyy-Www'),
 
   /**
@@ -26048,8 +26050,8 @@ var inputType = {
    </example>
    */
   'month': createDateInputType('month', MONTH_REGEXP,
-     createDateParser(MONTH_REGEXP, ['yyyy', 'MM']),
-     'yyyy-MM'),
+    createDateParser(MONTH_REGEXP, ['yyyy', 'MM']),
+    'yyyy-MM'),
 
   /**
    * @ngdoc input
@@ -26489,10 +26491,6 @@ var inputType = {
    *
    * The model for the range input must always be a `Number`.
    *
-   * IE9 and other browsers that do not support the `range` type fall back
-   * to a text input without any default values for `min`, `max` and `step`. Model binding,
-   * validation and number parsing are nevertheless supported.
-   *
    * Browsers that support range (latest Chrome, Safari, Firefox, Edge) treat `input[range]`
    * in a way that never allows the input to hold an invalid value. That means:
    * - any non-numerical value is set to `(max + min) / 2`.
@@ -26664,7 +26662,7 @@ var inputType = {
 };
 
 function stringBasedInputType(ctrl) {
-  ctrl.$formatters.push(function(value) {
+  ctrl.$formatters.push(function (value) {
     return ctrl.$isEmpty(value) ? value : value.toString();
   });
 }
@@ -26683,12 +26681,12 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   if (!$sniffer.android) {
     var composing = false;
 
-    element.on('compositionstart', function() {
+    element.on('compositionstart', function () {
       composing = true;
     });
 
     // Support: IE9+
-    element.on('compositionupdate', function(ev) {
+    element.on('compositionupdate', function (ev) {
       // End composition when ev.data is empty string on 'compositionupdate' event.
       // When the input de-focusses (e.g. by clicking away), IE triggers 'compositionupdate'
       // instead of 'compositionend'.
@@ -26697,7 +26695,7 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
       }
     });
 
-    element.on('compositionend', function() {
+    element.on('compositionend', function () {
       composing = false;
       listener();
     });
@@ -26705,14 +26703,14 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
 
   var timeout;
 
-  var listener = function(ev) {
+  var listener = function (ev) {
     if (timeout) {
       $browser.defer.cancel(timeout);
       timeout = null;
     }
     if (composing) return;
     var value = element.val(),
-        event = ev && ev.type;
+      event = ev && ev.type;
 
     // By default we will trim the value
     // If the attribute ng-trim exists we will avoid trimming
@@ -26734,9 +26732,9 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   if ($sniffer.hasEvent('input')) {
     element.on('input', listener);
   } else {
-    var deferListener = function(ev, input, origValue) {
+    var deferListener = function (ev, input, origValue) {
       if (!timeout) {
-        timeout = $browser.defer(function() {
+        timeout = $browser.defer(function () {
           timeout = null;
           if (!input || input.value !== origValue) {
             listener(ev);
@@ -26745,7 +26743,7 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
       }
     };
 
-    element.on('keydown', /** @this */ function(event) {
+    element.on('keydown', /** @this */ function (event) {
       var key = event.keyCode;
 
       // ignore
@@ -26770,12 +26768,12 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   // For these event types, when native validators are present and the browser supports the type,
   // check for validity changes on various DOM events.
   if (PARTIAL_VALIDATION_TYPES[type] && ctrl.$$hasNativeValidators && type === attr.type) {
-    element.on(PARTIAL_VALIDATION_EVENTS, /** @this */ function(ev) {
+    element.on(PARTIAL_VALIDATION_EVENTS, /** @this */ function (ev) {
       if (!timeout) {
         var validity = this[VALIDITY_STATE_PROPERTY];
         var origBadInput = validity.badInput;
         var origTypeMismatch = validity.typeMismatch;
-        timeout = $browser.defer(function() {
+        timeout = $browser.defer(function () {
           timeout = null;
           if (validity.badInput !== origBadInput || validity.typeMismatch !== origTypeMismatch) {
             listener(ev);
@@ -26785,7 +26783,7 @@ function baseInputType(scope, element, attr, ctrl, $sniffer, $browser) {
     });
   }
 
-  ctrl.$render = function() {
+  ctrl.$render = function () {
     // Workaround for Firefox validation #12102.
     var value = ctrl.$isEmpty(ctrl.$viewValue) ? '' : ctrl.$viewValue;
     if (element.val() !== value) {
@@ -26804,13 +26802,13 @@ function weekParser(isoWeek, existingDate) {
     var parts = WEEK_REGEXP.exec(isoWeek);
     if (parts) {
       var year = +parts[1],
-          week = +parts[2],
-          hours = 0,
-          minutes = 0,
-          seconds = 0,
-          milliseconds = 0,
-          firstThurs = getFirstThursdayOfYear(year),
-          addDays = (week - 1) * 7;
+        week = +parts[2],
+        hours = 0,
+        minutes = 0,
+        seconds = 0,
+        milliseconds = 0,
+        firstThurs = getFirstThursdayOfYear(year),
+        addDays = (week - 1) * 7;
 
       if (existingDate) {
         hours = existingDate.getHours();
@@ -26827,7 +26825,7 @@ function weekParser(isoWeek, existingDate) {
 }
 
 function createDateParser(regexp, mapping) {
-  return function(iso, previousDate) {
+  return function (iso, previousDate) {
     var parts, map;
 
     if (isDate(iso)) {
@@ -26863,7 +26861,7 @@ function createDateParser(regexp, mapping) {
           map = { yyyy: 1970, MM: 1, dd: 1, HH: 0, mm: 0, ss: 0, sss: 0 };
         }
 
-        forEach(parts, function(part, index) {
+        forEach(parts, function (part, index) {
           if (index < mapping.length) {
             map[mapping[index]] = +part;
           }
@@ -26893,7 +26891,7 @@ function createDateInputType(type, regexp, parseDate, format) {
     var previousDate;
     var previousTimezone;
 
-    ctrl.$parsers.push(function(value) {
+    ctrl.$parsers.push(function (value) {
       if (ctrl.$isEmpty(value)) return null;
 
       if (regexp.test(value)) {
@@ -26906,7 +26904,7 @@ function createDateInputType(type, regexp, parseDate, format) {
       return undefined;
     });
 
-    ctrl.$formatters.push(function(value) {
+    ctrl.$formatters.push(function (value) {
       if (value && !isDate(value)) {
         throw ngModelMinErr('datefmt', 'Expected `{0}` to be a date', value);
       }
@@ -26931,10 +26929,10 @@ function createDateInputType(type, regexp, parseDate, format) {
       var minVal = attr.min || $parse(attr.ngMin)(scope);
       var parsedMinVal = parseObservedDateValue(minVal);
 
-      ctrl.$validators.min = function(value) {
+      ctrl.$validators.min = function (value) {
         return !isValidDate(value) || isUndefined(parsedMinVal) || parseDate(value) >= parsedMinVal;
       };
-      attr.$observe('min', function(val) {
+      attr.$observe('min', function (val) {
         if (val !== minVal) {
           parsedMinVal = parseObservedDateValue(val);
           minVal = val;
@@ -26947,10 +26945,10 @@ function createDateInputType(type, regexp, parseDate, format) {
       var maxVal = attr.max || $parse(attr.ngMax)(scope);
       var parsedMaxVal = parseObservedDateValue(maxVal);
 
-      ctrl.$validators.max = function(value) {
+      ctrl.$validators.max = function (value) {
         return !isValidDate(value) || isUndefined(parsedMaxVal) || parseDate(value) <= parsedMaxVal;
       };
-      attr.$observe('max', function(val) {
+      attr.$observe('max', function (val) {
         if (val !== maxVal) {
           parsedMaxVal = parseObservedDateValue(val);
           maxVal = val;
@@ -26994,7 +26992,7 @@ function createDateInputType(type, regexp, parseDate, format) {
           .replace(/:$/, '');
       }
 
-      var formatted =  $filter('date')(value, targetFormat, timezone);
+      var formatted = $filter('date')(value, targetFormat, timezone);
 
       if (isTimeType && ctrl.$options.getOption('timeStripZeroSeconds')) {
         formatted = formatted.replace(/(?::00)?(?:\.000)?$/, '');
@@ -27009,7 +27007,7 @@ function badInputChecker(scope, element, attr, ctrl, parserName) {
   var node = element[0];
   var nativeValidation = ctrl.$$hasNativeValidators = isObject(node.validity);
   if (nativeValidation) {
-    ctrl.$parsers.push(function(value) {
+    ctrl.$parsers.push(function (value) {
       var validity = element.prop(VALIDITY_STATE_PROPERTY) || {};
       if (validity.badInput || validity.typeMismatch) {
         ctrl.$$parserName = parserName;
@@ -27022,15 +27020,15 @@ function badInputChecker(scope, element, attr, ctrl, parserName) {
 }
 
 function numberFormatterParser(ctrl) {
-  ctrl.$parsers.push(function(value) {
-    if (ctrl.$isEmpty(value))      return null;
+  ctrl.$parsers.push(function (value) {
+    if (ctrl.$isEmpty(value)) return null;
     if (NUMBER_REGEXP.test(value)) return parseFloat(value);
 
     ctrl.$$parserName = 'number';
     return undefined;
   });
 
-  ctrl.$formatters.push(function(value) {
+  ctrl.$formatters.push(function (value) {
     if (!ctrl.$isEmpty(value)) {
       if (!isNumber(value)) {
         throw ngModelMinErr('numfmt', 'Expected `{0}` to be a number', value);
@@ -27118,11 +27116,11 @@ function numberInputType(scope, element, attr, ctrl, $sniffer, $browser, $filter
     var minVal = attr.min || $parse(attr.ngMin)(scope);
     parsedMinVal = parseNumberAttrVal(minVal);
 
-    ctrl.$validators.min = function(modelValue, viewValue) {
+    ctrl.$validators.min = function (modelValue, viewValue) {
       return ctrl.$isEmpty(viewValue) || isUndefined(parsedMinVal) || viewValue >= parsedMinVal;
     };
 
-    attr.$observe('min', function(val) {
+    attr.$observe('min', function (val) {
       if (val !== minVal) {
         parsedMinVal = parseNumberAttrVal(val);
         minVal = val;
@@ -27136,11 +27134,11 @@ function numberInputType(scope, element, attr, ctrl, $sniffer, $browser, $filter
     var maxVal = attr.max || $parse(attr.ngMax)(scope);
     var parsedMaxVal = parseNumberAttrVal(maxVal);
 
-    ctrl.$validators.max = function(modelValue, viewValue) {
+    ctrl.$validators.max = function (modelValue, viewValue) {
       return ctrl.$isEmpty(viewValue) || isUndefined(parsedMaxVal) || viewValue <= parsedMaxVal;
     };
 
-    attr.$observe('max', function(val) {
+    attr.$observe('max', function (val) {
       if (val !== maxVal) {
         parsedMaxVal = parseNumberAttrVal(val);
         maxVal = val;
@@ -27154,12 +27152,12 @@ function numberInputType(scope, element, attr, ctrl, $sniffer, $browser, $filter
     var stepVal = attr.step || $parse(attr.ngStep)(scope);
     var parsedStepVal = parseNumberAttrVal(stepVal);
 
-    ctrl.$validators.step = function(modelValue, viewValue) {
+    ctrl.$validators.step = function (modelValue, viewValue) {
       return ctrl.$isEmpty(viewValue) || isUndefined(parsedStepVal) ||
         isValidForStep(viewValue, parsedMinVal || 0, parsedStepVal);
     };
 
-    attr.$observe('step', function(val) {
+    attr.$observe('step', function (val) {
       // TODO(matsko): implement validateLater to reduce number of validations
       if (val !== stepVal) {
         parsedStepVal = parseNumberAttrVal(val);
@@ -27178,13 +27176,13 @@ function rangeInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   baseInputType(scope, element, attr, ctrl, $sniffer, $browser);
 
   var supportsRange = ctrl.$$hasNativeValidators && element[0].type === 'range',
-      minVal = supportsRange ? 0 : undefined,
-      maxVal = supportsRange ? 100 : undefined,
-      stepVal = supportsRange ? 1 : undefined,
-      validity = element[0].validity,
-      hasMinAttr = isDefined(attr.min),
-      hasMaxAttr = isDefined(attr.max),
-      hasStepAttr = isDefined(attr.step);
+    minVal = supportsRange ? 0 : undefined,
+    maxVal = supportsRange ? 100 : undefined,
+    stepVal = supportsRange ? 1 : undefined,
+    validity = element[0].validity,
+    hasMinAttr = isDefined(attr.min),
+    hasMaxAttr = isDefined(attr.max),
+    hasStepAttr = isDefined(attr.step);
 
   var originalRender = ctrl.$render;
 
@@ -27238,7 +27236,7 @@ function rangeInputType(scope, element, attr, ctrl, $sniffer, $browser) {
       // ngStep doesn't set the setp attr, so the browser doesn't adjust the input value as setting step would
       function stepValidator(modelValue, viewValue) {
         return ctrl.$isEmpty(viewValue) || isUndefined(stepVal) ||
-               isValidForStep(viewValue, minVal || 0, stepVal);
+          isValidForStep(viewValue, minVal || 0, stepVal);
       };
 
     setInitialValueAndObserver('step', stepChange);
@@ -27324,7 +27322,7 @@ function urlInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   baseInputType(scope, element, attr, ctrl, $sniffer, $browser);
   stringBasedInputType(ctrl);
 
-  ctrl.$validators.url = function(modelValue, viewValue) {
+  ctrl.$validators.url = function (modelValue, viewValue) {
     var value = modelValue || viewValue;
     return ctrl.$isEmpty(value) || URL_REGEXP.test(value);
   };
@@ -27336,7 +27334,7 @@ function emailInputType(scope, element, attr, ctrl, $sniffer, $browser) {
   baseInputType(scope, element, attr, ctrl, $sniffer, $browser);
   stringBasedInputType(ctrl);
 
-  ctrl.$validators.email = function(modelValue, viewValue) {
+  ctrl.$validators.email = function (modelValue, viewValue) {
     var value = modelValue || viewValue;
     return ctrl.$isEmpty(value) || EMAIL_REGEXP.test(value);
   };
@@ -27349,7 +27347,7 @@ function radioInputType(scope, element, attr, ctrl) {
     element.attr('name', nextUid());
   }
 
-  var listener = function(ev) {
+  var listener = function (ev) {
     var value;
     if (element[0].checked) {
       value = attr.value;
@@ -27362,7 +27360,7 @@ function radioInputType(scope, element, attr, ctrl) {
 
   element.on('change', listener);
 
-  ctrl.$render = function() {
+  ctrl.$render = function () {
     var value = attr.value;
     if (doTrim) {
       value = trim(value);
@@ -27379,7 +27377,7 @@ function parseConstantExpr($parse, context, name, expression, fallback) {
     parseFn = $parse(expression);
     if (!parseFn.constant) {
       throw ngModelMinErr('constexpr', 'Expected constant expression for `{0}`, but saw ' +
-                                   '`{1}`.', name, expression);
+        '`{1}`.', name, expression);
     }
     return parseFn(context);
   }
@@ -27390,28 +27388,28 @@ function checkboxInputType(scope, element, attr, ctrl, $sniffer, $browser, $filt
   var trueValue = parseConstantExpr($parse, scope, 'ngTrueValue', attr.ngTrueValue, true);
   var falseValue = parseConstantExpr($parse, scope, 'ngFalseValue', attr.ngFalseValue, false);
 
-  var listener = function(ev) {
+  var listener = function (ev) {
     ctrl.$setViewValue(element[0].checked, ev && ev.type);
   };
 
   element.on('change', listener);
 
-  ctrl.$render = function() {
+  ctrl.$render = function () {
     element[0].checked = ctrl.$viewValue;
   };
 
   // Override the standard `$isEmpty` because the $viewValue of an empty checkbox is always set to `false`
   // This is because of the parser below, which compares the `$modelValue` with `trueValue` to convert
   // it to a boolean.
-  ctrl.$isEmpty = function(value) {
+  ctrl.$isEmpty = function (value) {
     return value === false;
   };
 
-  ctrl.$formatters.push(function(value) {
+  ctrl.$formatters.push(function (value) {
     return equals(value, trueValue);
   });
 
-  ctrl.$parsers.push(function(value) {
+  ctrl.$parsers.push(function (value) {
     return value ? trueValue : falseValue;
   });
 }
@@ -27451,19 +27449,6 @@ function checkboxInputType(scope, element, attr, ctrl, $sniffer, $browser, $filt
  *    interaction with the input element.
  * @param {boolean=} [ngTrim=true] If set to false AngularJS will not automatically trim the input.
  *
- * @knownIssue
- *
- * When specifying the `placeholder` attribute of `<textarea>`, Internet Explorer will temporarily
- * insert the placeholder value as the textarea's content. If the placeholder value contains
- * interpolation (`{{ ... }}`), an error will be logged in the console when AngularJS tries to update
- * the value of the by-then-removed text node. This doesn't affect the functionality of the
- * textarea, but can be undesirable.
- *
- * You can work around this Internet Explorer issue by using `ng-attr-placeholder` instead of
- * `placeholder` on textareas, whenever you need interpolation in the placeholder value. You can
- * find more details on `ngAttr` in the
- * [Interpolation](guide/interpolation#-ngattr-for-binding-to-arbitrary-attributes) section of the
- * Developer Guide.
  */
 
 
@@ -27605,30 +27590,30 @@ function checkboxInputType(scope, element, attr, ctrl, $sniffer, $browser, $filt
     </example>
  */
 var inputDirective = ['$browser', '$sniffer', '$filter', '$parse',
-    function($browser, $sniffer, $filter, $parse) {
-  return {
-    restrict: 'E',
-    require: ['?ngModel'],
-    link: {
-      pre: function(scope, element, attr, ctrls) {
-        if (ctrls[0]) {
-          (inputType[lowercase(attr.type)] || inputType.text)(scope, element, attr, ctrls[0], $sniffer,
-                                                              $browser, $filter, $parse);
+  function ($browser, $sniffer, $filter, $parse) {
+    return {
+      restrict: 'E',
+      require: ['?ngModel'],
+      link: {
+        pre: function (scope, element, attr, ctrls) {
+          if (ctrls[0]) {
+            (inputType[lowercase(attr.type)] || inputType.text)(scope, element, attr, ctrls[0], $sniffer,
+              $browser, $filter, $parse);
+          }
         }
       }
-    }
-  };
-}];
+    };
+  }];
 
 
-var hiddenInputBrowserCacheDirective = function() {
+var hiddenInputBrowserCacheDirective = function () {
   var valueProperty = {
     configurable: true,
     enumerable: false,
-    get: function() {
+    get: function () {
       return this.getAttribute('value') || '';
     },
-    set: function(val) {
+    set: function (val) {
       this.setAttribute('value', val);
     }
   };
@@ -27636,13 +27621,13 @@ var hiddenInputBrowserCacheDirective = function() {
   return {
     restrict: 'E',
     priority: 200,
-    compile: function(_, attr) {
+    compile: function (_, attr) {
       if (lowercase(attr.type) !== 'hidden') {
         return;
       }
 
       return {
-        pre: function(scope, element, attr, ctrls) {
+        pre: function (scope, element, attr, ctrls) {
           var node = element[0];
 
           // Support: Edge
@@ -27722,7 +27707,7 @@ var CONSTANT_VALUE_REGEXP = /^(true|false|\d+)$/;
       </file>
     </example>
  */
-var ngValueDirective = function() {
+var ngValueDirective = function () {
   /**
    *  inputs use the value attribute as their default value if the value property is not set.
    *  Once the value property has been set (by adding input), it will not react to changes to
@@ -27730,9 +27715,7 @@ var ngValueDirective = function() {
    *  makes it possible to use ngValue as a sort of one-way bind.
    */
   function updateElementValue(element, attr, value) {
-    // Support: IE9 only
-    // In IE9 values are converted to string (e.g. `input.value = null` results in `input.value === 'null'`).
-    var propValue = isDefined(value) ? value : (msie === 9) ? '' : null;
+    var propValue = isDefined(value) ? value : null;
     element.prop('value', propValue);
     attr.$set('value', value);
   }
@@ -27740,7 +27723,7 @@ var ngValueDirective = function() {
   return {
     restrict: 'A',
     priority: 100,
-    compile: function(tpl, tplAttr) {
+    compile: function (tpl, tplAttr) {
       if (CONSTANT_VALUE_REGEXP.test(tplAttr.ngValue)) {
         return function ngValueConstantLink(scope, elm, attr) {
           var value = scope.$eval(attr.ngValue);
@@ -29775,13 +29758,7 @@ var ngIfDirective = ['$animate', '$compile', function($animate, $compile) {
  * @param {string} ngInclude|src AngularJS expression evaluating to URL. If the source is a string constant,
  *                 make sure you wrap it in **single** quotes, e.g. `src="'myPartialTemplate.html'"`.
  * @param {string=} onload Expression to evaluate when a new partial is loaded.
- *                  <div class="alert alert-warning">
- *                  **Note:** When using onload on SVG elements in IE11, the browser will try to call
- *                  a function with the name on the window element, which will usually throw a
- *                  "function is undefined" error. To fix this, you can instead use `data-onload` or a
- *                  different form that {@link guide/directive#normalization matches} `onload`.
- *                  </div>
-   *
+ * 
  * @param {string=} autoscroll Whether `ngInclude` should call {@link ng.$anchorScroll
  *                  $anchorScroll} to scroll the viewport after the content is loaded.
  *
@@ -32657,7 +32634,6 @@ var ngOptionsDirective = ['$compile', '$document', '$parse', function($compile, 
   }
 
 
-  // Support: IE 9 only
   // We can't just jqLite('<option>') since jqLite is not smart enough
   // to create it in <select> and IE barfs otherwise.
   var optionTemplate = window.document.createElement('option'),
@@ -32866,8 +32842,8 @@ var ngOptionsDirective = ['$compile', '$document', '$parse', function($compile, 
       function updateOptionElement(option, element) {
         option.element = element;
         element.disabled = option.disabled;
-        // Support: IE 11 only, Edge 12-13 only
-        // NOTE: The label must be set before the value, otherwise IE 11 & Edge create unresponsive
+        // Support: Edge 12-13 only
+        // NOTE: The label must be set before the value, otherwise Edge create unresponsive
         // selects in certain circumstances when multiple selects are next to each other and display
         // the option list in listbox style, i.e. the select is [multiple], or specifies a [size].
         // See https://github.com/angular/angular.js/issues/11314 for more info.
@@ -34357,8 +34333,7 @@ var NG_HIDE_IN_PROGRESS_CLASS = 'ng-hide-animate';
  * happen that both the element to show and the element to hide are visible for a very short time.
  *
  * This usually happens when the {@link ngAnimate ngAnimate module} is included, but no actual animations
- * are defined for {@link ngShow} / {@link ngHide}. Internet Explorer is affected more often than
- * other browsers.
+ * are defined for {@link ngShow} / {@link ngHide}.
  *
  * There are several way to mitigate this problem:
  *
@@ -34576,8 +34551,7 @@ var ngShowDirective = ['$animate', function($animate) {
  * happen that both the element to show and the element to hide are visible for a very short time.
  *
  * This usually happens when the {@link ngAnimate ngAnimate module} is included, but no actual animations
- * are defined for {@link ngShow} / {@link ngHide}. Internet Explorer is affected more often than
- * other browsers.
+ * are defined for {@link ngShow} / {@link ngHide}.
  *
  * There are several way to mitigate this problem:
  *
@@ -35702,7 +35676,7 @@ var SelectController =
  * - increased render speed by creating the options in a documentFragment instead of individually
  *
  * Specifically, select with repeated options slows down significantly starting at 2000 options in
- * Chrome and Internet Explorer / Edge.
+ * Chrome and Edge.
  *
  *
  * @param {string} ngModel Assignable AngularJS expression to data-bind to.
@@ -35968,8 +35942,8 @@ var selectDirective = function() {
                                                includes(value, selectCtrl.selectValueMap[option.value]));
             var currentlySelected = option.selected;
 
-            // Support: IE 9-11 only, Edge 12-15+
-            // In IE and Edge adding options to the selection via shift+click/UP/DOWN
+            // Support: Edge 12-15+
+            // In Edge adding options to the selection via shift+click/UP/DOWN
             // will de-select already selected options if "selected" on those options was set
             // more than once (i.e. when the options were already selected)
             // So we only modify the selected property if necessary.

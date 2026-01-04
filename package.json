@@ -1,6 +1,6 @@
 {
   "name": "angular-lts",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "description": "AngularJS LTS (Long Term Support) - HTML enhanced for web apps",
   "license": "MIT",
   "author": "Angular Core Team <angular-core+npm@google.com>",
